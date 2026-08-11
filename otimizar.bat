@@ -39,7 +39,7 @@ pause
 :: 1. LIMPEZA DE ARQUIVOS TEMPORARIOS
 :: ============================================
 echo.
-echo [1/5] Limpando arquivos temporarios...
+echo [1/8] Limpando arquivos temporarios...
 echo ------------------------------------------------
 
 echo - Limpando %%temp%%...
@@ -59,13 +59,29 @@ echo - Limpando Recentes...
 del /q /f /s "%APPDATA%\Microsoft\Windows\Recent\*.*" >nul 2>&1
 for /d %%x in ("%APPDATA%\Microsoft\Windows\Recent\*") do rd /s /q "%%x" >nul 2>&1
 
+echo - Limpando cache do Windows Update (parando servico com seguranca)...
+net stop wuauserv >nul 2>&1
+del /q /f /s "C:\Windows\SoftwareDistribution\Download\*.*" >nul 2>&1
+for /d %%x in ("C:\Windows\SoftwareDistribution\Download\*") do rd /s /q "%%x" >nul 2>&1
+net start wuauserv >nul 2>&1
+
+echo - Limpando cache de miniaturas (thumbnails)...
+del /q /f /a "%LOCALAPPDATA%\Microsoft\Windows\Explorer\thumbcache_*.db" >nul 2>&1
+
+echo - Limpando cache de icones...
+powershell -NoProfile -Command "ie4uinit.exe -ClearIconCache" >nul 2>&1
+
+echo - Limpando relatorios de erro do Windows (WER)...
+del /q /f /s "%ProgramData%\Microsoft\Windows\WER\ReportQueue\*.*" >nul 2>&1
+del /q /f /s "%ProgramData%\Microsoft\Windows\WER\ReportArchive\*.*" >nul 2>&1
+
 echo Limpeza concluida (arquivos em uso sao ignorados automaticamente).
 echo.
 
 :: ============================================
 :: 2. VERIFICACAO DE DISCO E ARQUIVOS DE SISTEMA
 :: ============================================
-echo [2/5] Verificando disco e integridade do sistema...
+echo [2/8] Verificando disco e integridade do sistema...
 echo ------------------------------------------------
 
 echo - Agendando verificacao de disco (chkdsk)...
@@ -89,7 +105,7 @@ echo.
 :: ============================================
 :: 3. RESTAURACAO DA IMAGEM DO WINDOWS (DISM)
 :: ============================================
-echo [3/5] Verificando e restaurando imagem do Windows...
+echo [3/8] Verificando e restaurando imagem do Windows...
 echo ------------------------------------------------
 
 dism /online /cleanup-image /checkhealth
@@ -99,9 +115,53 @@ dism /online /cleanup-image /restorehealth
 echo.
 
 :: ============================================
-:: 4. ATUALIZACAO DE PROGRAMAS (WINGET)
+:: 4. LIMPEZA DE COMPONENTES ANTIGOS (WinSxS)
 :: ============================================
-echo [4/5] Atualizando todos os programas via winget...
+echo [4/8] Analisando e limpando componentes antigos do Windows (WinSxS)...
+echo ------------------------------------------------
+
+echo - Analisando o repositorio de componentes...
+dism /online /cleanup-image /AnalyzeComponentStore
+
+echo.
+echo - Removendo componentes antigos ja substituidos (mantem opcao de rollback dos updates mais recentes)...
+dism /online /cleanup-image /StartComponentCleanup
+
+echo.
+set /p resetbase="Deseja tambem remover TODAS as versoes antigas de updates (/ResetBase)? Isso libera mais espaco, mas voce perde a opcao de desinstalar atualizacoes ja aplicadas. (S/N): "
+if /i "%resetbase%"=="S" (
+    echo Executando limpeza completa com ResetBase...
+    dism /online /cleanup-image /StartComponentCleanup /ResetBase
+) else (
+    echo Pulando /ResetBase - mantendo opcao de rollback de updates recentes.
+)
+echo.
+
+:: ============================================
+:: 5. OTIMIZACAO DE DISCO (SSD/HDD AUTOMATICO)
+:: ============================================
+echo [5/8] Otimizando disco (detectando tipo automaticamente)...
+echo ------------------------------------------------
+
+powershell -NoProfile -Command "$disk = Get-PhysicalDisk | Where-Object { $_.DeviceID -eq 0 }; if ($disk.MediaType -eq 'SSD') { Write-Host 'Disco SSD detectado - executando TRIM...'; Optimize-Volume -DriveLetter C -ReTrim -Verbose } else { Write-Host 'Disco HDD detectado - executando desfragmentacao...'; Optimize-Volume -DriveLetter C -Defrag -Verbose }"
+
+echo.
+
+:: ============================================
+:: 6. LIMPEZA DE LOGS DE EVENTOS
+:: ============================================
+echo [6/8] Limpando logs de eventos do Windows...
+echo ------------------------------------------------
+
+powershell -NoProfile -Command "Get-WinEvent -ListLog * -ErrorAction SilentlyContinue | ForEach-Object { wevtutil.exe clear-log $_.LogName 2>$null }"
+echo Logs de eventos limpos.
+
+echo.
+
+:: ============================================
+:: 7. ATUALIZACAO DE PROGRAMAS (WINGET)
+:: ============================================
+echo [7/8] Atualizando todos os programas via winget...
 echo ------------------------------------------------
 
 where winget >nul 2>&1
@@ -127,9 +187,9 @@ echo Executando: %winget_exe% upgrade --all --include-unknown --accept-source-ag
 echo.
 
 :: ============================================
-:: 5. AJUSTES DE ENERGIA
+:: 8. AJUSTES DE ENERGIA
 :: ============================================
-echo [5/5] Ajustando configuracoes de energia...
+echo [8/8] Ajustando configuracoes de energia...
 echo ------------------------------------------------
 
 echo - Desativando hibernacao...
