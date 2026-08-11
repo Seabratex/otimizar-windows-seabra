@@ -1,10 +1,10 @@
 # Otimizar Windows
 
-Script `.bat` para otimização de PCs com Windows 10/11, com auto-elevação de administrador e execução em 7 etapas.
+Script `.bat` para otimização de PCs com Windows 10/11, com auto-elevação de administrador e execução em 8 etapas.
 
 ## ⚠️ Aviso
 
-Este script faz alterações reais no sistema: apaga arquivos temporários, reinicia o serviço do Windows Update, roda verificação de disco (`chkdsk`), reparo de imagem (`DISM`), otimização de disco (`TRIM`/desfragmentação) e pode agendar reinicialização. **Leia o código antes de rodar** e use por sua conta e risco.
+Este script faz alterações reais no sistema: apaga arquivos temporários, reinicia o serviço do Windows Update, roda verificação de disco (`chkdsk`), reparo de imagem (`DISM`), limpeza de componentes antigos do Windows, otimização de disco (`TRIM`/desfragmentação) e pode agendar reinicialização. **Leia o código antes de rodar** e use por sua conta e risco.
 
 ## O que o script faz
 
@@ -22,15 +22,20 @@ Este script faz alterações reais no sistema: apaga arquivos temporários, rein
 3. **Restauração da imagem do Windows**
    - `DISM /checkhealth`, `/scanhealth`, `/restorehealth`
 
-4. **Otimização de disco automática**
+4. **Limpeza de componentes antigos (WinSxS)**
+   - `DISM /AnalyzeComponentStore` — analisa quanto espaço pode ser recuperado
+   - `DISM /StartComponentCleanup` — remove componentes antigos já substituídos, mantendo a opção de desinstalar a atualização mais recente
+   - `DISM /StartComponentCleanup /ResetBase` — **opcional** (pergunta antes): libera mais espaço, mas remove a opção de rollback de atualizações já aplicadas
+
+5. **Otimização de disco automática**
    - Detecta se o disco é SSD ou HDD e aplica `TRIM` ou desfragmentação, conforme o caso
 
-5. **Limpeza de logs de eventos do Windows**
+6. **Limpeza de logs de eventos do Windows**
 
-6. **Atualização de programas via Winget**
+7. **Atualização de programas via Winget**
    - `winget upgrade --all`, com fallback para localizar o executável quando não está no PATH da sessão elevada
 
-7. **Ajustes de energia**
+8. **Ajustes de energia**
    - Desativa hibernação
    - Ativa o plano de energia "Desempenho Máximo"
 
