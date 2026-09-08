@@ -1,10 +1,10 @@
 # Otimizar Windows
 
-Script `.bat` para otimização de PCs com Windows 10/11, com auto-elevação de administrador e execução em 8 etapas.
+Script `.bat` para otimização de PCs com Windows 10/11, com auto-elevação de administrador e execução em 10 etapas.
 
 ## ⚠️ Aviso
 
-Este script faz alterações reais no sistema: apaga arquivos temporários, reinicia o serviço do Windows Update, roda verificação de disco (`chkdsk`), reparo de imagem (`DISM`), limpeza de componentes antigos do Windows, otimização de disco (`TRIM`/desfragmentação) e pode agendar reinicialização. **Leia o código antes de rodar** e use por sua conta e risco.
+Este script faz alterações reais no sistema: apaga arquivos temporários, reinicia o serviço do Windows Update, roda verificação de disco (`chkdsk`), reparo de imagem (`DISM`), limpeza de componentes antigos do Windows, otimização de disco (`TRIM`/desfragmentação), reset de rede e pode agendar reinicialização. **Leia o código antes de rodar** e use por sua conta e risco.
 
 ## O que o script faz
 
@@ -21,6 +21,7 @@ Este script faz alterações reais no sistema: apaga arquivos temporários, rein
 
 3. **Restauração da imagem do Windows**
    - `DISM /checkhealth`, `/scanhealth`, `/restorehealth`
+   - O `/restorehealth` roda com **limite de segurança de 15 minutos** — se travar sem avançar, é cancelado automaticamente e o script continua
 
 4. **Limpeza de componentes antigos (WinSxS)**
    - `DISM /AnalyzeComponentStore` — analisa quanto espaço pode ser recuperado
@@ -32,12 +33,20 @@ Este script faz alterações reais no sistema: apaga arquivos temporários, rein
 
 6. **Limpeza de logs de eventos do Windows**
 
-7. **Atualização de programas via Winget**
+7. **Limpeza adicional**
+   - Configura e executa o Limpeza de Disco nativo (`cleanmgr /sagerun`) com todas as categorias marcadas
+   - Ativa o **Storage Sense**, para o Windows continuar limpando arquivos temporários automaticamente depois
+
+8. **Rede**
+   - Limpa cache DNS e renova o IP
+   - Reset de **Winsock e TCP/IP** — **opcional** (pergunta antes, exige reiniciar o PC): útil se a internet estiver lenta ou instável
+
+9. **Atualização de programas via Winget**
    - `winget upgrade --all`, com fallback para localizar o executável quando não está no PATH da sessão elevada
 
-8. **Ajustes de energia**
-   - Desativa hibernação
-   - Ativa o plano de energia "Desempenho Máximo"
+10. **Ajustes de energia**
+    - Desativa hibernação
+    - Ativa o plano de energia "Desempenho Máximo"
 
 ## Como usar
 
