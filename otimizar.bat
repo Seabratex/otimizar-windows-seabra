@@ -40,7 +40,7 @@ pause
 :: 1. LIMPEZA DE ARQUIVOS TEMPORARIOS
 :: ============================================
 echo.
-echo [1/8] Limpando arquivos temporarios...
+echo [1/10] Limpando arquivos temporarios...
 echo ------------------------------------------------
 
 echo - Limpando %%temp%%...
@@ -82,7 +82,7 @@ echo.
 :: ============================================
 :: 2. VERIFICACAO DE DISCO E ARQUIVOS DE SISTEMA
 :: ============================================
-echo [2/8] Verificando disco e integridade do sistema...
+echo [2/10] Verificando disco e integridade do sistema...
 echo ------------------------------------------------
 
 echo - Agendando verificacao de disco (chkdsk)...
@@ -106,7 +106,7 @@ echo.
 :: ============================================
 :: 3. RESTAURACAO DA IMAGEM DO WINDOWS (DISM)
 :: ============================================
-echo [3/8] Verificando e restaurando imagem do Windows...
+echo [3/10] Verificando e restaurando imagem do Windows...
 echo ------------------------------------------------
 
 dism /online /cleanup-image /checkhealth
@@ -132,7 +132,7 @@ echo.
 :: ============================================
 :: 4. LIMPEZA DE COMPONENTES ANTIGOS (WinSxS)
 :: ============================================
-echo [4/8] Analisando e limpando componentes antigos do Windows (WinSxS)...
+echo [4/10] Analisando e limpando componentes antigos do Windows (WinSxS)...
 echo ------------------------------------------------
 
 echo - Analisando o repositorio de componentes...
@@ -155,7 +155,7 @@ echo.
 :: ============================================
 :: 5. OTIMIZACAO DE DISCO (SSD/HDD AUTOMATICO)
 :: ============================================
-echo [5/8] Otimizando disco (detectando tipo automaticamente)...
+echo [5/10] Otimizando disco (detectando tipo automaticamente)...
 echo ------------------------------------------------
 
 powershell -NoProfile -Command "$disk = Get-PhysicalDisk | Where-Object { $_.DeviceID -eq 0 }; if ($disk.MediaType -eq 'SSD') { Write-Host 'Disco SSD detectado - executando TRIM...'; Optimize-Volume -DriveLetter C -ReTrim -Verbose } else { Write-Host 'Disco HDD detectado - executando desfragmentacao...'; Optimize-Volume -DriveLetter C -Defrag -Verbose }"
@@ -165,7 +165,7 @@ echo.
 :: ============================================
 :: 6. LIMPEZA DE LOGS DE EVENTOS
 :: ============================================
-echo [6/8] Limpando logs de eventos do Windows...
+echo [6/10] Limpando logs de eventos do Windows...
 echo ------------------------------------------------
 
 powershell -NoProfile -Command "Get-WinEvent -ListLog * -ErrorAction SilentlyContinue | ForEach-Object { wevtutil.exe clear-log $_.LogName 2>$null }"
@@ -174,9 +174,57 @@ echo Logs de eventos limpos.
 echo.
 
 :: ============================================
-:: 7. ATUALIZACAO DE PROGRAMAS (WINGET)
+:: 7. LIMPEZA ADICIONAL (CLEANMGR + STORAGE SENSE)
 :: ============================================
-echo [7/8] Atualizando todos os programas via winget...
+echo [7/10] Limpeza adicional do sistema...
+echo ------------------------------------------------
+
+echo - Configurando perfil completo do Limpeza de Disco (cleanmgr)...
+for /f "tokens=1" %%K in ('reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches" 2^>nul ^| findstr /r "HKLM"') do (
+    reg add "%%K" /v StateFlags0100 /t REG_DWORD /d 2 /f >nul 2>&1
+)
+
+echo - Executando Limpeza de Disco completa (isso pode levar alguns minutos)...
+cleanmgr /sagerun:100
+
+echo.
+echo - Ativando Storage Sense (limpeza automatica recorrente do Windows)...
+powershell -NoProfile -Command "New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy' -Force | Out-Null; Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy' -Name '01' -Value 1 -Type DWord -ErrorAction SilentlyContinue"
+echo Storage Sense ativado - o Windows vai limpar arquivos temporarios automaticamente a partir de agora.
+
+echo.
+
+:: ============================================
+:: 8. REDE (DNS, WINSOCK E TCP/IP)
+:: ============================================
+echo [8/10] Otimizando e resetando configuracoes de rede...
+echo ------------------------------------------------
+
+echo - Limpando cache DNS...
+ipconfig /flushdns >nul 2>&1
+
+echo - Liberando e renovando IP...
+ipconfig /release >nul 2>&1
+ipconfig /renew >nul 2>&1
+
+echo.
+set /p resetrede="Deseja resetar Winsock e TCP/IP tambem? Util se a internet estiver lenta/instavel. Requer REINICIAR o PC depois. (S/N): "
+if /i "%resetrede%"=="S" (
+    echo Resetando Winsock...
+    netsh winsock reset >nul 2>&1
+    echo Resetando TCP/IP...
+    netsh int ip reset >nul 2>&1
+    echo Reset de rede concluido - REINICIE o computador para aplicar.
+) else (
+    echo Pulando reset de Winsock/TCP-IP.
+)
+
+echo.
+
+:: ============================================
+:: 9. ATUALIZACAO DE PROGRAMAS (WINGET)
+:: ============================================
+echo [9/10] Atualizando todos os programas via winget...
 echo ------------------------------------------------
 
 where winget >nul 2>&1
@@ -202,9 +250,9 @@ echo Executando: %winget_exe% upgrade --all --include-unknown --accept-source-ag
 echo.
 
 :: ============================================
-:: 8. AJUSTES DE ENERGIA
+:: 10. AJUSTES DE ENERGIA
 :: ============================================
-echo [8/8] Ajustando configuracoes de energia...
+echo [10/10] Ajustando configuracoes de energia...
 echo ------------------------------------------------
 
 echo - Desativando hibernacao...
