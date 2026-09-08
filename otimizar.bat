@@ -26,7 +26,7 @@ echo                  _
 echo   ___  ___  __ _^| ^|__  _ __ __ _ 
 echo  / __^|/ _ \/ _` ^| '_ \^| '__/ _` ^|
 echo  \__ \  __/ (_^| ^| ^|_) ^| ^| ^| (_^| ^|
-echo  ^|___/\___/\____^|____/^|_^|  \__,_^|
+echo  ^|___/\___/\__,_^|_.__/^|_^|  \__,_^|
 echo.
 echo                github.com/Seabratex
 echo.
@@ -111,7 +111,21 @@ echo ------------------------------------------------
 
 dism /online /cleanup-image /checkhealth
 dism /online /cleanup-image /scanhealth
-dism /online /cleanup-image /restorehealth
+
+echo.
+echo - Executando RestoreHealth (limite de seguranca: 15 minutos)...
+echo   Se travar sem avancar, o script cancela automaticamente e continua.
+echo.
+
+powershell -NoProfile -Command ^
+    "$job = Start-Job -ScriptBlock { dism /online /cleanup-image /restorehealth }; ^
+    if (Wait-Job $job -Timeout 900) { Receive-Job $job } ^
+    else { Write-Host '[AVISO] RestoreHealth excedeu 15 minutos sem concluir - cancelando e seguindo em frente.' -ForegroundColor Yellow; Stop-Job $job; Remove-Job $job -Force; Get-Process dism -ErrorAction SilentlyContinue | Stop-Process -Force }"
+
+echo.
+echo Se o RestoreHealth foi cancelado por timeout, rode manualmente depois com:
+echo   DISM /Online /Cleanup-Image /RestoreHealth
+echo (idealmente com uma ISO do Windows como fonte, se sua internet/Windows Update estiver com problema)
 
 echo.
 
