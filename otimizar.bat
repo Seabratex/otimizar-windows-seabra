@@ -119,13 +119,55 @@ echo.
 
 powershell -NoProfile -Command ^
     "$job = Start-Job -ScriptBlock { dism /online /cleanup-image /restorehealth }; ^
-    if (Wait-Job $job -Timeout 900) { Receive-Job $job } ^
-    else { Write-Host '[AVISO] RestoreHealth excedeu 15 minutos sem concluir - cancelando e seguindo em frente.' -ForegroundColor Yellow; Stop-Job $job; Remove-Job $job -Force; Get-Process dism -ErrorAction SilentlyContinue | Stop-Process -Force }"
+    if (Wait-Job $job -Timeout 900) { Receive-Job $job; exit 0 } ^
+    else { Write-Host '[AVISO] RestoreHealth excedeu 15 minutos sem concluir - cancelando.' -ForegroundColor Yellow; Stop-Job $job; Remove-Job $job -Force; Get-Process dism -ErrorAction SilentlyContinue | Stop-Process -Force; exit 1 }"
 
-echo.
-echo Se o RestoreHealth foi cancelado por timeout, rode manualmente depois com:
-echo   DISM /Online /Cleanup-Image /RestoreHealth
-echo (idealmente com uma ISO do Windows como fonte, se sua internet/Windows Update estiver com problema)
+if errorlevel 1 (
+    echo.
+    echo [AVISO] RestoreHealth travou. Resetando componentes do Windows Update e tentando novamente...
+    echo ------------------------------------------------
+
+    echo - Cancelando downloads pendentes do BITS...
+    powershell -NoProfile -Command "Get-BitsTransfer -AllUsers -ErrorAction SilentlyContinue | Remove-BitsTransfer -ErrorAction SilentlyContinue"
+
+    net stop wuauserv >nul 2>&1
+    net stop cryptSvc >nul 2>&1
+    net stop bits >nul 2>&1
+    net stop msiserver >nul 2>&1
+    net stop appidsvc >nul 2>&1
+
+    echo - Removendo arquivos travados do BITS (QMGR)...
+    del /q /f "%ALLUSERSPROFILE%\Microsoft\Network\Downloader\qmgr*.dat" >nul 2>&1
+
+    ren "C:\Windows\SoftwareDistribution" SoftwareDistribution.old >nul 2>&1
+    ren "C:\Windows\System32\catroot2" catroot2.old >nul 2>&1
+
+    echo - Reregistrando DLLs do BITS e Windows Update...
+    regsvr32 /s qmgr.dll
+    regsvr32 /s wuaueng.dll
+    regsvr32 /s wuapi.dll
+    regsvr32 /s wucltui.dll
+    regsvr32 /s wups.dll
+    regsvr32 /s wups2.dll
+
+    net start wuauserv >nul 2>&1
+    net start cryptSvc >nul 2>&1
+    net start bits >nul 2>&1
+    net start msiserver >nul 2>&1
+    net start appidsvc >nul 2>&1
+
+    echo Componentes resetados. Tentando RestoreHealth novamente (limite: 15 minutos)...
+    echo.
+
+    powershell -NoProfile -Command ^
+        "$job = Start-Job -ScriptBlock { dism /online /cleanup-image /restorehealth }; ^
+        if (Wait-Job $job -Timeout 900) { Receive-Job $job } ^
+        else { Write-Host '[AVISO] RestoreHealth travou novamente mesmo apos o reset.' -ForegroundColor Red; Stop-Job $job; Remove-Job $job -Force; Get-Process dism -ErrorAction SilentlyContinue | Stop-Process -Force }"
+
+    echo.
+    echo Se ainda assim travou, o ideal e rodar com uma ISO do Windows como fonte:
+    echo   DISM /Online /Cleanup-Image /RestoreHealth /Source:WIM:X:\sources\install.wim:1 /LimitAccess
+)
 
 echo.
 
@@ -212,6 +254,8 @@ set /p resetrede="Deseja resetar Winsock e TCP/IP tambem? Util se a internet est
 if /i "%resetrede%"=="S" (
     echo Resetando Winsock...
     netsh winsock reset >nul 2>&1
+    echo Resetando proxy do WinHTTP para Direto...
+    netsh winhttp reset proxy >nul 2>&1
     echo Resetando TCP/IP...
     netsh int ip reset >nul 2>&1
     echo Reset de rede concluido - REINICIE o computador para aplicar.
