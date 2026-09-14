@@ -21,7 +21,8 @@ Este script faz alterações reais no sistema: apaga arquivos temporários, rein
 
 3. **Restauração da imagem do Windows**
    - `DISM /checkhealth`, `/scanhealth`, `/restorehealth`
-   - O `/restorehealth` roda com **limite de segurança de 15 minutos** — se travar sem avançar, é cancelado automaticamente e o script continua
+   - O `/restorehealth` roda com **limite de segurança de 15 minutos** — se travar sem avançar, é cancelado automaticamente
+   - Se travar, o script reseta os componentes do Windows Update automaticamente e tenta de novo: cancela downloads pendentes do BITS, remove arquivos `qmgr*.dat` travados, reinicia os serviços (`wuauserv`, `cryptSvc`, `bits`, `msiserver`, `appidsvc`), renomeia `SoftwareDistribution`/`catroot2` e reregistra as DLLs do Windows Update (`qmgr.dll`, `wuaueng.dll`, `wuapi.dll`, `wucltui.dll`, `wups.dll`, `wups2.dll`)
 
 4. **Limpeza de componentes antigos (WinSxS)**
    - `DISM /AnalyzeComponentStore` — analisa quanto espaço pode ser recuperado
@@ -39,7 +40,7 @@ Este script faz alterações reais no sistema: apaga arquivos temporários, rein
 
 8. **Rede**
    - Limpa cache DNS e renova o IP
-   - Reset de **Winsock e TCP/IP** — **opcional** (pergunta antes, exige reiniciar o PC): útil se a internet estiver lenta ou instável
+   - Reset de **Winsock, proxy do WinHTTP e TCP/IP** — **opcional** (pergunta antes, exige reiniciar o PC): útil se a internet estiver lenta ou instável
 
 9. **Atualização de programas via Winget**
    - `winget upgrade --all`, com fallback para localizar o executável quando não está no PATH da sessão elevada
