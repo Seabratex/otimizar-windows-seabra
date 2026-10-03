@@ -117,10 +117,7 @@ echo - Executando RestoreHealth (limite de seguranca: 15 minutos)...
 echo   Se travar sem avancar, o script cancela automaticamente e continua.
 echo.
 
-powershell -NoProfile -Command ^
-    "$job = Start-Job -ScriptBlock { dism /online /cleanup-image /restorehealth }; ^
-    if (Wait-Job $job -Timeout 900) { Receive-Job $job; exit 0 } ^
-    else { Write-Host '[AVISO] RestoreHealth excedeu 15 minutos sem concluir - cancelando.' -ForegroundColor Yellow; Stop-Job $job; Remove-Job $job -Force; Get-Process dism -ErrorAction SilentlyContinue | Stop-Process -Force; exit 1 }"
+powershell -NoProfile -Command "$job = Start-Job -ScriptBlock { dism /online /cleanup-image /restorehealth }; if (Wait-Job $job -Timeout 900) { Receive-Job $job; exit 0 } else { Write-Host '[AVISO] RestoreHealth excedeu 15 minutos sem concluir - cancelando.' -ForegroundColor Yellow; Stop-Job $job; Remove-Job $job -Force; Get-Process dism -ErrorAction SilentlyContinue | Stop-Process -Force; exit 1 }"
 
 if errorlevel 1 (
     echo.
@@ -159,10 +156,7 @@ if errorlevel 1 (
     echo Componentes resetados. Tentando RestoreHealth novamente (limite: 15 minutos)...
     echo.
 
-    powershell -NoProfile -Command ^
-        "$job = Start-Job -ScriptBlock { dism /online /cleanup-image /restorehealth }; ^
-        if (Wait-Job $job -Timeout 900) { Receive-Job $job } ^
-        else { Write-Host '[AVISO] RestoreHealth travou novamente mesmo apos o reset.' -ForegroundColor Red; Stop-Job $job; Remove-Job $job -Force; Get-Process dism -ErrorAction SilentlyContinue | Stop-Process -Force }"
+    powershell -NoProfile -Command "$job = Start-Job -ScriptBlock { dism /online /cleanup-image /restorehealth }; if (Wait-Job $job -Timeout 900) { Receive-Job $job } else { Write-Host '[AVISO] RestoreHealth travou novamente mesmo apos o reset.' -ForegroundColor Red; Stop-Job $job; Remove-Job $job -Force; Get-Process dism -ErrorAction SilentlyContinue | Stop-Process -Force }"
 
     echo.
     echo Se ainda assim travou, o ideal e rodar com uma ISO do Windows como fonte:
