@@ -17,6 +17,9 @@ if '%errorlevel%' NEQ '0' (
     exit /b
 )
 
+:: --- Desativa o "QuickEdit Mode" do console (evita que um clique na janela pause o script) ---
+reg add "HKCU\Console" /v QuickEdit /t REG_DWORD /d 0 /f >nul 2>&1
+
 :: --- Log automatico (grava checkpoints com hora em um .txt ao lado do script) ---
 set "LOGFILE=%~dpn0_log.txt"
 echo ============================================ > "%LOGFILE%"
@@ -58,10 +61,15 @@ echo - Limpando C:\Windows\Temp...
 del /q /f /s "C:\Windows\Temp\*.*" >nul 2>&1
 for /d %%x in ("C:\Windows\Temp\*") do rd /s /q "%%x" >nul 2>&1
 
-echo - Limpando Prefetch...
-takeown /f "C:\Windows\Prefetch" /r /d y >nul 2>&1
-icacls "C:\Windows\Prefetch" /grant administradores:F /t >nul 2>&1
-del /q /f /s "C:\Windows\Prefetch\*.*" >nul 2>&1
+set /p limparpref="Deseja limpar a pasta Prefetch? Geralmente nao e necessario, o Windows recria e os apps podem abrir um pouco mais lentos na primeira vez. (S/N): "
+if /i "%limparpref%"=="S" (
+    echo - Limpando Prefetch...
+    takeown /f "C:\Windows\Prefetch" /r /d y >nul 2>&1
+    icacls "C:\Windows\Prefetch" /grant *S-1-5-32-544:F /t >nul 2>&1
+    del /q /f /s "C:\Windows\Prefetch\*.*" >nul 2>&1
+) else (
+    echo Pulando Prefetch.
+)
 
 echo - Limpando Recentes...
 del /q /f /s "%APPDATA%\Microsoft\Windows\Recent\*.*" >nul 2>&1
@@ -114,64 +122,18 @@ echo.
 :: ============================================
 :: 3. RESTAURACAO DA IMAGEM DO WINDOWS (DISM)
 :: ============================================
-echo [%date% %time%] Iniciando etapa 3/10 - DISM RestoreHealth >> "%LOGFILE%"
-echo [3/10] Verificando e restaurando imagem do Windows...
+echo [%date% %time%] Iniciando etapa 3/10 - DISM CheckHealth/ScanHealth >> "%LOGFILE%"
+echo [3/10] Verificando integridade da imagem do Windows...
 echo ------------------------------------------------
 
 dism /online /cleanup-image /checkhealth
 dism /online /cleanup-image /scanhealth
 
 echo.
-echo - Executando RestoreHealth (limite de seguranca: 15 minutos)...
-echo   Se travar sem avancar, o script cancela automaticamente e continua.
-echo.
-
-powershell -NoProfile -Command "$job = Start-Job -ScriptBlock { dism /online /cleanup-image /restorehealth }; if (Wait-Job $job -Timeout 900) { Receive-Job $job | Tee-Object -FilePath '%LOGFILE%' -Append; exit 0 } else { Write-Host '[AVISO] RestoreHealth excedeu 15 minutos sem concluir - cancelando.' -ForegroundColor Yellow; 'RestoreHealth (1a tentativa) excedeu 15 minutos e foi cancelado' | Out-File -FilePath '%LOGFILE%' -Append; Stop-Job $job; Remove-Job $job -Force; Get-Process dism -ErrorAction SilentlyContinue | Stop-Process -Force; exit 1 }"
-
-if errorlevel 1 (
-    echo [%date% %time%] Entrando no fallback de reset do Windows Update >> "%LOGFILE%"
-    echo.
-    echo [AVISO] RestoreHealth travou. Resetando componentes do Windows Update e tentando novamente...
-    echo ------------------------------------------------
-
-    echo - Cancelando downloads pendentes do BITS...
-    powershell -NoProfile -Command "Get-BitsTransfer -AllUsers -ErrorAction SilentlyContinue | Remove-BitsTransfer -ErrorAction SilentlyContinue"
-
-    net stop wuauserv >nul 2>&1
-    net stop cryptSvc >nul 2>&1
-    net stop bits >nul 2>&1
-    net stop msiserver >nul 2>&1
-    net stop appidsvc >nul 2>&1
-
-    echo - Removendo arquivos travados do BITS - QMGR...
-    del /q /f "%ALLUSERSPROFILE%\Microsoft\Network\Downloader\qmgr*.dat" >nul 2>&1
-
-    ren "C:\Windows\SoftwareDistribution" SoftwareDistribution.old >nul 2>&1
-    ren "C:\Windows\System32\catroot2" catroot2.old >nul 2>&1
-
-    echo - Reregistrando DLLs do BITS e Windows Update...
-    regsvr32 /s qmgr.dll
-    regsvr32 /s wuaueng.dll
-    regsvr32 /s wuapi.dll
-    regsvr32 /s wucltui.dll
-    regsvr32 /s wups.dll
-    regsvr32 /s wups2.dll
-
-    net start wuauserv >nul 2>&1
-    net start cryptSvc >nul 2>&1
-    net start bits >nul 2>&1
-    net start msiserver >nul 2>&1
-    net start appidsvc >nul 2>&1
-
-    echo Componentes resetados. Tentando RestoreHealth novamente - limite de 15 minutos...
-    echo.
-
-    powershell -NoProfile -Command "$job = Start-Job -ScriptBlock { dism /online /cleanup-image /restorehealth }; if (Wait-Job $job -Timeout 900) { Receive-Job $job | Tee-Object -FilePath '%LOGFILE%' -Append } else { Write-Host '[AVISO] RestoreHealth travou novamente mesmo apos o reset.' -ForegroundColor Red; 'RestoreHealth (2a tentativa, apos reset) excedeu 15 minutos e foi cancelado' | Out-File -FilePath '%LOGFILE%' -Append; Stop-Job $job; Remove-Job $job -Force; Get-Process dism -ErrorAction SilentlyContinue | Stop-Process -Force }"
-
-    echo.
-    echo Se ainda assim travou, o ideal e rodar com uma ISO do Windows como fonte:
-    echo   DISM /Online /Cleanup-Image /RestoreHealth /Source:WIM:X:\sources\install.wim:1 /LimitAccess
-)
+echo Diagnostico concluido. O RestoreHealth (reparo profundo) foi removido do fluxo
+echo automatico por ser demorado e instavel em alguns PCs - so e necessario se o
+echo scanhealth acima apontar corrupcao. Se precisar reparar, rode manualmente:
+echo   DISM /Online /Cleanup-Image /RestoreHealth
 
 echo.
 
@@ -206,7 +168,7 @@ echo [%date% %time%] Iniciando etapa 5/10 - Otimizacao de disco >> "%LOGFILE%"
 echo [5/10] Otimizando disco (detectando tipo automaticamente)...
 echo ------------------------------------------------
 
-powershell -NoProfile -Command "$disk = Get-PhysicalDisk | Where-Object { $_.DeviceID -eq 0 }; if ($disk.MediaType -eq 'SSD') { Write-Host 'Disco SSD detectado - executando TRIM...'; Optimize-Volume -DriveLetter C -ReTrim -Verbose } else { Write-Host 'Disco HDD detectado - executando desfragmentacao...'; Optimize-Volume -DriveLetter C -Defrag -Verbose }"
+powershell -NoProfile -Command "$n = (Get-Partition -DriveLetter C -ErrorAction SilentlyContinue).DiskNumber; $type = (Get-PhysicalDisk -ErrorAction SilentlyContinue | Where-Object { $_.DeviceId -eq $n }).MediaType; if ($type -eq 'SSD') { Write-Host 'Drive C: esta em um SSD - executando TRIM...' -ForegroundColor Green; Optimize-Volume -DriveLetter C -ReTrim -Verbose } elseif ($type -eq 'HDD') { Write-Host 'Drive C: esta em um HDD - executando desfragmentacao...' -ForegroundColor Green; Optimize-Volume -DriveLetter C -Defrag -Verbose } else { Write-Host 'Tipo de disco nao identificado - executando otimizacao padrao do Windows...' -ForegroundColor Yellow; Optimize-Volume -DriveLetter C -Verbose }"
 
 echo.
 
@@ -214,11 +176,17 @@ echo.
 :: 6. LIMPEZA DE LOGS DE EVENTOS
 :: ============================================
 echo [%date% %time%] Iniciando etapa 6/10 - Limpeza de logs de eventos >> "%LOGFILE%"
-echo [6/10] Limpando logs de eventos do Windows...
+echo [6/10] Logs de eventos do Windows...
 echo ------------------------------------------------
 
-powershell -NoProfile -Command "Get-WinEvent -ListLog * -ErrorAction SilentlyContinue | ForEach-Object { wevtutil.exe clear-log $_.LogName 2>$null }"
-echo Logs de eventos limpos.
+set /p limparlogs="Deseja limpar todos os logs do Visualizador de Eventos? Isso apaga historico util para diagnostico de erros. (S/N): "
+if /i "%limparlogs%"=="S" (
+    echo Limpando logs de eventos...
+    powershell -NoProfile -Command "Get-WinEvent -ListLog * -ErrorAction SilentlyContinue | ForEach-Object { wevtutil.exe clear-log $_.LogName 2>$null }"
+    echo Logs de eventos limpos.
+) else (
+    echo Pulando limpeza de logs de eventos.
+)
 
 echo.
 
@@ -281,22 +249,21 @@ echo [%date% %time%] Iniciando etapa 9/10 - Winget >> "%LOGFILE%"
 echo [9/10] Atualizando todos os programas via winget...
 echo ------------------------------------------------
 
+set "winget_exe=winget"
 where winget >nul 2>&1
-if errorlevel 1 (
-    echo [AVISO] Winget nao foi encontrado no PATH desta sessao elevada.
-    echo Isso e comum quando o script eleva para administrador.
-    echo Tentando localizar o executavel diretamente...
-    for /f "delims=" %%W in ('powershell -NoProfile -Command "(Get-AppxPackage -Name Microsoft.DesktopAppInstaller).InstallLocation"') do set "wingetpath=%%W"
-    if defined wingetpath (
-        set "winget_exe=%wingetpath%\winget.exe"
-    ) else (
-        echo [ERRO] Nao foi possivel localizar o winget. Pulando atualizacao.
-        goto pular_winget
-    )
-) else (
-    set "winget_exe=winget"
-)
+if not errorlevel 1 goto winget_executar
 
+echo [AVISO] Winget nao foi encontrado no PATH desta sessao elevada.
+echo Tentando localizar o executavel diretamente...
+set "wingetpath="
+for /f "delims=" %%W in ('powershell -NoProfile -Command "(Get-AppxPackage -Name Microsoft.DesktopAppInstaller).InstallLocation"') do set "wingetpath=%%W"
+if not defined wingetpath (
+    echo [ERRO] Nao foi possivel localizar o winget. Pulando atualizacao.
+    goto pular_winget
+)
+set "winget_exe=%wingetpath%\winget.exe"
+
+:winget_executar
 echo Executando: %winget_exe% upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
 "%winget_exe%" upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements --disable-interactivity
 
@@ -310,12 +277,37 @@ echo [%date% %time%] Iniciando etapa 10/10 - Energia >> "%LOGFILE%"
 echo [10/10] Ajustando configuracoes de energia...
 echo ------------------------------------------------
 
+set /p alterarenergia="Deseja desativar a hibernacao e ativar o plano de Desempenho Maximo? Nao recomendado para notebooks usando bateria. (S/N): "
+if /i not "%alterarenergia%"=="S" goto energia_pular
+
 echo - Desativando hibernacao...
 powercfg.exe /hibernate off
 
-echo - Ativando plano de Desempenho Maximo...
-powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
+echo - Criando e ativando o plano de Desempenho Maximo...
+set "NEW_SCHEME="
+for /f "tokens=2 delims=:" %%G in ('powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61 2^>nul') do for /f %%H in ("%%G") do set "NEW_SCHEME=%%H"
 
+if defined NEW_SCHEME (
+    powercfg -setactive %NEW_SCHEME% >nul 2>&1
+    if errorlevel 1 (
+        echo [AVISO] O plano foi criado, mas nao foi possivel ativa-lo.
+    ) else (
+        echo Plano Desempenho Maximo ativado.
+    )
+) else (
+    powercfg -setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c >nul 2>&1
+    if errorlevel 1 (
+        echo [AVISO] Nao foi possivel ativar nenhum plano de alto desempenho.
+    ) else (
+        echo Desempenho Maximo indisponivel neste PC - esquema Alto Desempenho ativado.
+    )
+)
+goto energia_fim
+
+:energia_pular
+echo Mantendo os planos de energia atuais.
+
+:energia_fim
 echo [%date% %time%] Script concluido do inicio ao fim >> "%LOGFILE%"
 
 echo.
