@@ -1,3 +1,4 @@
+![Texto alternativo](SharedScreenshott.jpg)      
 # Otimizar Windows
 
 Script `.bat` para otimização de PCs com Windows 10/11, com auto-elevação de administrador e execução em 10 etapas.
