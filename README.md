@@ -1,5 +1,9 @@
 # Otimizar Windows
 
+<p align="center">
+  <img src="SharedScreenshott.jpg" alt="Interface do Otimizar Windows – Seabratex" width="90%">
+</p>
+
 Manutenção e limpeza para **Windows 10 e 11** em um **único arquivo**. Você dá duplo clique, confirma o pedido de administrador, escolhe o que quer rodar numa janela gráfica e acompanha o script trabalhando em tempo real.
 
 ![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)
