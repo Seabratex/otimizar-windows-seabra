@@ -4,6 +4,8 @@
   <img src="SharedScreenshott.jpg" alt="Interface do Otimizar Windows – Seabratex" width="90%">
 </p>
 
+# Otimizar Windows
+
 Manutenção e limpeza para **Windows 10 e 11** em um **único arquivo**. Você dá duplo clique, confirma o pedido de administrador, escolhe o que quer rodar numa janela gráfica e acompanha o script trabalhando em tempo real.
 
 ![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)
@@ -18,7 +20,8 @@ Manutenção e limpeza para **Windows 10 e 11** em um **único arquivo**. Você 
 2. Dê duplo clique nele e confirme o pedido de administrador do Windows.
 3. No menu que abre, escolha **1** para abrir a interface gráfica (ou **0** para sair).
 4. Marque as etapas, escolha as opções extras (todas começam desmarcadas) e clique em **Executar**.
-5. Acompanhe a saída ao vivo. No fim, leia o **resumo da execução**. Reinicie o PC se o resumo pedir.
+5. Acompanhe a saída ao vivo. No fim, leia o **resumo da execução**.
+6. O script pergunta se você quer **reiniciar o computador agora** (Sim ou Não). Se escolher Sim, começa uma contagem de **10 segundos**, com um botão para cancelar. O padrão é Não.
 
 Se o Windows mostrar "O Windows protegeu o seu PC", clique em *Mais informações* e depois em *Executar assim mesmo*. Isso acontece com qualquer script baixado da internet, e é por isso que o código é aberto e legível: abra o arquivo no Bloco de Notas e confira.
 
@@ -47,7 +50,7 @@ O script não diz "sucesso" por padrão. Ao terminar, ele mostra:
 - o **resultado do SFC**, lido do `CBS.log` (limpo, reparou ou não conseguiu reparar), o que funciona em Windows de qualquer idioma;
 - o **espaço livre no `C:` antes e depois**. O texto diz "aumentou" ou "diminuiu" de propósito: o script mede a diferença, mas não afirma que foi ele que liberou o espaço, já que atualizações e reparos também ocupam disco;
 - um aviso quando há **reinicialização pendente** no Windows, porque SFC e DISM podem falhar nesse estado;
-- o que exige **reiniciar** o computador.
+- se algo exige **reiniciar** o computador, e em seguida a pergunta de reinício descrita acima.
 
 ## O que ele altera
 
@@ -68,6 +71,7 @@ Transparência total sobre o que fica diferente depois de rodar:
 - Não baixa nem executa código de terceiros. O único acesso à internet é o `winget`, que baixa atualizações dos seus programas, e só na etapa 9.
 - Não envia nenhum dado para fora, não tem telemetria e não cria tarefas agendadas.
 - Não remove aplicativos do Windows e não altera o arquivo `hosts`.
+- Não reinicia nem desliga o PC sem você clicar em **Sim**. Depois do Sim, ainda dá tempo de cancelar durante os 10 segundos.
 - Não faz ajustes "mágicos" de registro nem promete aumento de FPS ou de desempenho. O que ele mede é espaço em disco.
 - O reparo profundo `DISM /RestoreHealth` **não roda sozinho**, por ser demorado e instável em alguns PCs. Se o diagnóstico apontar corrupção, rode manualmente: `DISM /Online /Cleanup-Image /RestoreHealth`.
 
