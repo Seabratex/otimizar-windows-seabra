@@ -709,6 +709,8 @@ $script:selected   = @()
 $script:stepLabel  = ''
 $script:lastBlank  = $false
 $script:hadWarnings = $false
+$script:needReboot  = $false
+$script:sawSummary  = $false
 
 # ---------------------------------------------------------------- janela
 $form = New-Object System.Windows.Forms.Form
@@ -924,6 +926,8 @@ $ProgressTextLine = '(?i)(\d+(?:[.,]\d+)?\s*%\s*(conclu|complet))|(percent compl
 function Handle-Line([string]$line) {
     if ($null -eq $line) { return }
     $t = $line.TrimEnd()
+    if ($t -match 'reinicie o computador') { $script:needReboot = $true }
+    if ($t -match 'RESUMO DA EXECUCAO')    { $script:sawSummary = $true }
 
     if ($t -match $ProgressBarLine) {
         $lblStatus.Text = ('{0}  -  {1}%' -f $script:stepLabel, $Matches[1])
@@ -960,6 +964,88 @@ function Handle-Line([string]$line) {
     else                               { Add-Log $t }
 }
 
+# ---------------------------------------------------------------- reinício ao final
+function New-DialogForm([string]$title, [int]$w, [int]$h) {
+    $f = New-Object System.Windows.Forms.Form
+    $f.Text = $title
+    $f.StartPosition = 'CenterParent'
+    $f.FormBorderStyle = 'FixedDialog'
+    $f.MaximizeBox = $false
+    $f.MinimizeBox = $false
+    $f.ShowInTaskbar = $false
+    $f.ClientSize = New-Object System.Drawing.Size($w, $h)
+    $f.BackColor = $Navy
+    $f.Font = $FontUi
+    return $f
+}
+
+function Show-RestartFlow {
+    if ($script:needReboot) {
+        $msg = "Algumas etapas pedem reiniciar o computador para concluir as alterações.`n`nDeseja reiniciar agora?"
+    } else {
+        $msg = "A otimização terminou. Reiniciar agora é opcional.`n`nDeseja reiniciar o computador?"
+    }
+    $msg += "`n`nSe escolher Sim, o computador reinicia em 10 segundos. Salve o que estiver aberto antes."
+
+    $dlg = New-DialogForm 'Reiniciar o computador?' 460 220
+    $lbl = New-Label $msg 24 20 412 130 $FontUi $TextLight
+    $btnYes = New-Button 'Sim, reiniciar' 24 160 200 40 $false
+    $btnNo  = New-Button 'Não' 236 160 200 40 $true
+    $btnYes.DialogResult = [System.Windows.Forms.DialogResult]::Yes
+    $btnNo.DialogResult  = [System.Windows.Forms.DialogResult]::No
+    $dlg.AcceptButton = $btnNo
+    $dlg.CancelButton = $btnNo
+    $dlg.Controls.AddRange(@($lbl, $btnYes, $btnNo))
+    $answer = $dlg.ShowDialog($form)
+    $dlg.Dispose()
+
+    if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) {
+        Add-Log 'Reinício não solicitado.' $TextMuted
+        return
+    }
+
+    # agenda pelo próprio Windows: mesmo que esta janela feche, o reinício acontece
+    $scheduled = $false
+    try {
+        $p = Start-Process -FilePath 'shutdown.exe' -ArgumentList @('/r', '/t', '10', '/c', '"Reiniciando em 10 segundos para concluir a otimizacao."') -WindowStyle Hidden -Wait -PassThru
+        $scheduled = ($p.ExitCode -eq 0)
+    } catch { $scheduled = $false }
+    if (-not $scheduled) {
+        Add-Log '[ERRO] Não foi possível agendar o reinício. Reinicie manualmente.' $Red $true
+        return
+    }
+    Add-Log '- Reinício agendado em 10 segundos -' $Amber $true
+
+    $script:cdLeft = 10
+    $script:cdForm = New-DialogForm 'Reiniciando' 460 170
+    $script:cdForm.ControlBox = $false
+    $script:cdLbl  = New-Label 'O computador reinicia em 10 segundos.' 24 24 412 50 $FontHead $TextLight
+    $script:cdBtn  = New-Button 'Cancelar reinício' 110 100 240 40 $true
+    $script:cdForm.Controls.AddRange(@($script:cdLbl, $script:cdBtn))
+    $script:cdTimer = New-Object System.Windows.Forms.Timer
+    $script:cdTimer.Interval = 1000
+    $script:cdTimer.Add_Tick({
+        $script:cdLeft--
+        if ($script:cdLeft -gt 0) {
+            $script:cdLbl.Text = ('O computador reinicia em {0} segundos.' -f $script:cdLeft)
+        } else {
+            $script:cdTimer.Stop()
+            $script:cdLbl.Text = 'Reiniciando...'
+            $script:cdBtn.Enabled = $false
+        }
+    })
+    $script:cdBtn.Add_Click({
+        $script:cdTimer.Stop()
+        try { Start-Process -FilePath 'shutdown.exe' -ArgumentList @('/a') -WindowStyle Hidden -Wait | Out-Null } catch { }
+        Add-Log '- Reinício cancelado -' $Amber $true
+        $script:cdForm.Close()
+    })
+    $script:cdTimer.Start()
+    [void]$script:cdForm.ShowDialog($form)
+    $script:cdTimer.Dispose()
+    $script:cdForm.Dispose()
+}
+
 function Finish-Run {
     $timer.Stop()
     $wasCancelled = $script:cancelled
@@ -979,6 +1065,7 @@ function Finish-Run {
             Add-Log 'Concluído sem erros detectados.' $Green $true
             $lblStatus.Text = 'Concluído sem erros detectados.'
         }
+        if ($script:sawSummary) { Show-RestartFlow }
     }
 }
 
@@ -1033,6 +1120,8 @@ function Start-Run {
     $script:cancelled = $false
     $script:lastBlank = $false
     $script:hadWarnings = $false
+    $script:needReboot  = $false
+    $script:sawSummary  = $false
     $script:stepLabel = 'Iniciando...'
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
