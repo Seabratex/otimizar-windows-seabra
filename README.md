@@ -8,7 +8,6 @@
 
 Manutenção e limpeza para **Windows 10 e 11** em um **único arquivo**. Você dá duplo clique, confirma o pedido de administrador, escolhe o que quer rodar numa janela gráfica e acompanha o script trabalhando em tempo real.
 
-![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)
 ![Windows 10 e 11](https://img.shields.io/badge/Windows-10%20%7C%2011-informational)
 ![Sem instalação](https://img.shields.io/badge/instala%C3%A7%C3%A3o-nenhuma-success)
 
@@ -23,7 +22,7 @@ Manutenção e limpeza para **Windows 10 e 11** em um **único arquivo**. Você 
 5. Acompanhe a saída ao vivo. No fim, leia o **resumo da execução**.
 6. O script pergunta se você quer **reiniciar o computador agora** (Sim ou Não). Se escolher Sim, começa uma contagem de **10 segundos**, com um botão para cancelar. O padrão é Não.
 
-Se o Windows mostrar "O Windows protegeu o seu PC", clique em *Mais informações* e depois em *Executar assim mesmo*. Isso acontece com qualquer script baixado da internet, e é por isso que o código é aberto e legível: abra o arquivo no Bloco de Notas e confira.
+Se o Windows mostrar "O Windows protegeu o seu PC", clique em *Mais informações* e depois em *Executar assim mesmo*. Antes de executar, você pode abrir o arquivo no Bloco de Notas e conferir o conteúdo.
 
 ## O que ele faz
 
@@ -95,10 +94,6 @@ A janela gráfica e o arquivo único são recentes e foram testados em PCs reais
 - a versão do seu Windows;
 - uma foto ou captura da tela com o erro (se a janela não abrir, o menu do CMD mostra uma mensagem pedindo isso);
 - o arquivo `otimizar_log.txt`, se existir.
-
-## Licença
-
-[MIT](LICENSE). Use, modifique e distribua à vontade, mantendo o aviso de copyright.
 
 ---
 
